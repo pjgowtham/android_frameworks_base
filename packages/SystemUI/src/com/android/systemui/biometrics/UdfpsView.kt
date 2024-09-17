@@ -79,6 +79,7 @@ class UdfpsView(
 
     override fun onFinishInflate() {
         ghbmView = findViewById(R.id.hbm_view)
+        Log.e(TAG, "UdfpsHelper Finished Inflate")
     }
 
     override fun dozeTimeTick() {
