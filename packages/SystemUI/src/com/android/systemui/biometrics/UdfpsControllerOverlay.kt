@@ -162,7 +162,7 @@ class UdfpsControllerOverlay @JvmOverloads constructor(
             com.android.systemui.res.R.bool.config_udfpsFrameworkDimming)
 
     private val udfpsHelper: UdfpsHelper? = if (useFrameworkDimming) {
-        UdfpsHelper(context, windowManager, shadeInteractor, transitionInteractor, requestReason)
+        UdfpsHelper(context, windowManager, shadeInteractor, requestReason)
     } else
         null
 

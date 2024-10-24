@@ -30,10 +30,6 @@ import android.view.View
 import android.view.WindowManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
-import com.android.systemui.keyguard.shared.model.Edge
-import com.android.systemui.keyguard.shared.model.KeyguardState.LOCKSCREEN
-import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import kotlinx.coroutines.CoroutineScope
@@ -51,7 +47,6 @@ class UdfpsHelper(
     private val context: Context,
     private val windowManager: WindowManager,
     private val shadeInteractor: ShadeInteractor,
-    private val transitionInteractor: KeyguardTransitionInteractor,
     @RequestReason val requestReason: Int,
     private var view: View = View(context).apply {
         setBackgroundColor(Color.BLACK)
@@ -164,36 +159,13 @@ class UdfpsHelper(
                 listenForQsExpansion(this)
 
                 if (isKeyguard) {
-                    listenForAnyStateToLockscreenTransition(this)
-                    listenForLockscreenToAnyStateTransition(this)
+                    listenForShadeTouchability(this)
                 }
             }
         }
 
         if (!isKeyguard) {
             view.visibility = View.VISIBLE
-        }
-    }
-
-    private suspend fun listenForAnyStateToLockscreenTransition(scope: CoroutineScope): Job {
-        return scope.launch {
-            transitionInteractor.transition(Edge.create(to = LOCKSCREEN))
-                .collect { transitionStep ->
-                    if (transitionStep.transitionState == TransitionState.STARTED) {
-                        view.visibility = View.VISIBLE
-                    }
-                }
-        }
-    }
-
-    private suspend fun listenForLockscreenToAnyStateTransition(scope: CoroutineScope): Job {
-        return scope.launch {
-            transitionInteractor.transition(Edge.create(from = LOCKSCREEN))
-                .collect { transitionStep ->
-                    if (transitionStep.transitionState == TransitionState.FINISHED) {
-                        view.visibility = View.GONE
-                    }
-                }
         }
     }
 
@@ -229,6 +201,14 @@ class UdfpsHelper(
                     displayManager.unregisterDisplayListener(displayListener)
                     view.visibility = View.VISIBLE
                 }
+            }
+        }
+    }
+
+    private suspend fun listenForShadeTouchability(scope: CoroutineScope): Job {
+        return scope.launch {
+            shadeInteractor.isShadeTouchable.collect { isShadeTouchable ->
+                view.visibility = if (isShadeTouchable) View.VISIBLE else View.GONE
             }
         }
     }
