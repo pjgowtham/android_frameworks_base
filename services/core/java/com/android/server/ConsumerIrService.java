@@ -29,6 +29,8 @@ import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.util.Slog;
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
 
 import com.android.server.utils.LazyJniRegistrar;
 
@@ -160,5 +162,17 @@ public class ConsumerIrService extends IConsumerIrService.Stub {
                 return halGetCarrierFrequencies();
             }
         }
+    }
+
+    @Override
+    protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
+        if (mContext.checkCallingOrSelfPermission(android.Manifest.permission.DUMP)
+                != PackageManager.PERMISSION_GRANTED) {
+            pw.println("Permission Denied: Can't dump ConsumerIrService.");
+            return;
+        }
+
+        int[] freqs = getCarrierFrequencies();
+        pw.println("Supported IR Frequencies: " + (freqs == null ? "null" : java.util.Arrays.toString(freqs)));
     }
 }
