@@ -59,6 +59,7 @@ import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.res.R
+import com.android.systemui.settings.brightness.domain.interactor.BrightnessMirrorShowingInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager
 import com.android.systemui.statusbar.phone.SystemUIDialogManager
@@ -114,6 +115,7 @@ constructor(
     private val udfpsOverlayInteractor: UdfpsOverlayInteractor,
     private val powerInteractor: PowerInteractor,
     @Application private val scope: CoroutineScope,
+    private val brightnessMirrorShowingInteractor: BrightnessMirrorShowingInteractor,
 ) {
     private val currentStateUpdatedToOffAodOrDozing: Flow<Unit> =
         transitionInteractor.currentKeyguardState
@@ -144,7 +146,7 @@ constructor(
     )
 
     private val udfpsHelper: UdfpsHelper? = if (useFrameworkDimming) {
-        UdfpsHelper(context, windowManager, shadeInteractor, requestReason)
+        UdfpsHelper(context, windowManager, shadeInteractor, requestReason, brightnessMirrorShowingInteractor)
     } else {
         null
     }
