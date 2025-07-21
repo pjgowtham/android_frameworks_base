@@ -73,7 +73,7 @@ class UdfpsHelper(
         }
 
     private val dimLayoutParams = WindowManager.LayoutParams(
-        WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL,
+        WindowManager.LayoutParams.TYPE_MAGNIFICATION_OVERLAY,
         0 /* flags are set in computeLayoutParams() */,
         PixelFormat.TRANSPARENT
     ).apply {
