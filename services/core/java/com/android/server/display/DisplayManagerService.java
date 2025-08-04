@@ -2755,6 +2755,27 @@ public final class DisplayManagerService extends SystemService {
         Display.Mode mode = getStoredUserPreferredModeLocked(device);
         if (mode != null) {
             device.setUserPreferredDisplayModeLocked(mode);
+            return;
+        }
+
+        // Apply default mode from display device config's densityMapping default entry
+        DisplayDeviceConfig config = device.getDisplayDeviceConfig();
+        DensityMapping.Entry defaultEntry = null;
+        if (config != null && config.getDensityMapping() != null) {
+            defaultEntry = config.getDensityMapping().getDefaultEntry();
+        }
+
+        if (defaultEntry == null) {
+            return;
+        }
+
+        Display.Mode.Builder modeBuilder = new Display.Mode.Builder();
+        modeBuilder.setResolution(defaultEntry.width, defaultEntry.height);
+        Display.Mode defaultMode = modeBuilder.build();
+        if (defaultEntry != null) {
+            device.setUserPreferredDisplayModeLocked(defaultMode);
+            mPersistentDataStore.setUserPreferredResolution(device,
+                    defaultEntry.width, defaultEntry.height);
         }
     }
 
