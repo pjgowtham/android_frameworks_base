@@ -803,6 +803,7 @@ public class DisplayDeviceConfig {
     @Nullable
     private PowerThrottlingConfigData mPowerThrottlingConfigData;
     private DensityMapping mDensityMapping;
+    private boolean mHasDefaultDensity = false;
     private String mLoadedFrom = null;
 
     // Represents the auto-brightness brightening light debounce.
@@ -1682,6 +1683,15 @@ public class DisplayDeviceConfig {
     }
 
     /**
+     * Returns true if the device should default to max resolution.
+     * This is true only if a densityMapping is defined and no specific
+     * density within it is marked as the default.
+     */
+    public boolean defaultToMaxResolution() {
+        return mDensityMapping != null && mDensityMapping.getDefaultEntry() == null;
+    }
+
+    /**
      * While the device is dozing, a designated light sensor is used to determine the brightness.
      * @return The mapping between doze brightness sensor values and brightness values. The value
      * -1 means that the current brightness should be kept.
@@ -1981,7 +1991,8 @@ public class DisplayDeviceConfig {
             entries[i] = new DensityMapping.Entry(
                     density.getWidth().intValue(),
                     density.getHeight().intValue(),
-                    density.getDensity().intValue());
+                    density.getDensity().intValue(),
+                    density.get_default());
         }
         mDensityMapping = DensityMapping.createByOwning(entries);
     }

@@ -2664,11 +2664,16 @@ public final class DisplayManagerService extends SystemService {
 
     private void configurePreferredDisplayModeLocked(LogicalDisplay display) {
         final DisplayDevice device = display.getPrimaryDisplayDeviceLocked();
-        final Point userPreferredResolution =
+        final DisplayDeviceConfig config = device.getDisplayDeviceConfig();
+        boolean maxResolutionDefault = config.defaultToMaxResolution();
+        Point userPreferredResolution =
                 mPersistentDataStore.getUserPreferredResolution(device);
         final float refreshRate = mPersistentDataStore.getUserPreferredRefreshRate(device);
         if (userPreferredResolution == null && Float.isNaN(refreshRate)) {
-            return;
+            Point[] supportedResolutions = device.getSupportedResolutionsLocked();
+            if (!ArrayUtils.isEmpty(supportedResolutions) && maxResolutionDefault) {
+                userPreferredResolution = supportedResolutions[supportedResolutions.length - 1];
+            }
         }
         Display.Mode.Builder modeBuilder = new Display.Mode.Builder();
         if (userPreferredResolution != null) {

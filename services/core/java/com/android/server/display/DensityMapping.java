@@ -30,6 +30,7 @@ public class DensityMapping {
     // Squared diagonals have the same properties as diagonals (the square function is monotonic)
     // but also allow us to use integer types and avoid floating point arithmetics.
     private final Entry[] mSortedDensityMappingEntries;
+    private final Entry mDefaultEntry;
 
     /**
      * Creates a density mapping. The newly created object takes ownership of the passed array.
@@ -42,6 +43,14 @@ public class DensityMapping {
         Arrays.sort(densityMappingEntries, Comparator.comparingInt(
                 entry -> entry.squaredDiagonal));
         mSortedDensityMappingEntries = densityMappingEntries;
+        Entry defaultEntry = null;
+        for (Entry entry : densityMappingEntries) {
+            if (entry.isDefault) {
+                defaultEntry = entry;
+                break;
+            }
+        }
+        mDefaultEntry = defaultEntry;
         verifyDensityMapping(mSortedDensityMappingEntries);
     }
 
@@ -91,6 +100,13 @@ public class DensityMapping {
                 / (rightDiagonal - leftDiagonal) + left.density);
     }
 
+    /**
+     * Returns the default density entry, or null if no default is configured.
+     */
+    public Entry getDefaultEntry() {
+        return mDefaultEntry;
+    }
+
     private static void verifyDensityMapping(Entry[] sortedEntries) {
         for (int i = 1; i < sortedEntries.length; i++) {
             Entry prev = sortedEntries[i - 1];
@@ -114,6 +130,7 @@ public class DensityMapping {
     public String toString() {
         return "DensityMapping{"
                 + "mDensityMappingEntries=" + Arrays.toString(mSortedDensityMappingEntries)
+                + ", mDefaultEntry=" + mDefaultEntry
                 + '}';
     }
 
@@ -122,17 +139,24 @@ public class DensityMapping {
 
         public final int squaredDiagonal;
         public final int density;
+        public final boolean isDefault;
 
         Entry(int width, int height, int density) {
+            this(width, height, density, false);
+        }
+
+        Entry(int width, int height, int density, boolean isDefault) {
             this.squaredDiagonal = width * width + height * height;
             this.density = density;
+            this.isDefault = isDefault;
         }
 
         @Override
         public String toString() {
             return "DensityMappingEntry{"
                     + "squaredDiagonal=" + squaredDiagonal
-                    + ", density=" + density + '}';
+                    + ", density=" + density
+                    + ", isDefault=" + isDefault + '}';
         }
     }
 }
