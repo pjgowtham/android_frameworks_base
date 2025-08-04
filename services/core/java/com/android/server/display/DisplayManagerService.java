@@ -2664,12 +2664,26 @@ public final class DisplayManagerService extends SystemService {
 
     private void configurePreferredDisplayModeLocked(LogicalDisplay display) {
         final DisplayDevice device = display.getPrimaryDisplayDeviceLocked();
-        final Point userPreferredResolution =
+        final DisplayDeviceConfig config = device.getDisplayDeviceConfig();
+        Point userPreferredResolution =
                 mPersistentDataStore.getUserPreferredResolution(device);
         final float refreshRate = mPersistentDataStore.getUserPreferredRefreshRate(device);
+
         if (userPreferredResolution == null && Float.isNaN(refreshRate)) {
-            return;
+            DensityMapping densityMapping = config.getDensityMapping();
+            if (densityMapping == null) {
+                return;
+            }
+            DensityMapping.Entry defaultEntry = densityMapping.getDefaultEntry();
+            if (defaultEntry != null) {
+                userPreferredResolution = new Point(defaultEntry.width, defaultEntry.height);
+                mPersistentDataStore.setUserPreferredResolution(device, userPreferredResolution.x,
+                        userPreferredResolution.y);
+            } else {
+                return;
+            }
         }
+
         Display.Mode.Builder modeBuilder = new Display.Mode.Builder();
         if (userPreferredResolution != null) {
             modeBuilder.setResolution(userPreferredResolution.x, userPreferredResolution.y);

@@ -1981,7 +1981,8 @@ public class DisplayDeviceConfig {
             entries[i] = new DensityMapping.Entry(
                     density.getWidth().intValue(),
                     density.getHeight().intValue(),
-                    density.getDensity().intValue());
+                    density.getDensity().intValue(),
+                    density.get_default());
         }
         mDensityMapping = DensityMapping.createByOwning(entries);
     }
