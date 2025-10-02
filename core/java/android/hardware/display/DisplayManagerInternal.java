@@ -57,6 +57,33 @@ public abstract class DisplayManagerInternal {
     public static final int REFRESH_RATE_LIMIT_HIGH_BRIGHTNESS_MODE = 1;
 
     /**
+     * A listener for receiving proactive updates on the target brightness
+     * calculated by the automatic brightness controller.
+     */
+    public interface TargetBrightnessListener {
+        /**
+         * Called when a new target brightness has been calculated, before it is
+         * applied to the display.
+         *
+         * @param displayId The logical display ID.
+         * @param brightness The target brightness value (e.g., from 0.0f to 1.0f).
+         */
+        void onTargetBrightnessChanged(int displayId, float brightness);
+    }
+
+    /**
+     * Registers a listener to receive proactive brightness updates.
+     * @param listener The listener to register.
+     */
+    public abstract void registerTargetBrightnessListener(TargetBrightnessListener listener);
+
+    /**
+     * Unregisters a listener for proactive brightness updates.
+     * @param listener The listener to unregister.
+     */
+    public abstract void unregisterTargetBrightnessListener(TargetBrightnessListener listener);
+
+    /**
      * Called by the power manager to initialize power management facilities.
      */
     public abstract void initPowerManagement(DisplayPowerCallbacks callbacks,

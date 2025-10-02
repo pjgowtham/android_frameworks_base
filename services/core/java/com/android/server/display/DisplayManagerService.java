@@ -437,6 +437,9 @@ public final class DisplayManagerService extends SystemService {
         }
     };
 
+    @GuardedBy("mSyncRoot")
+    private DisplayManagerInternal.TargetBrightnessListener mTargetBrightnessListener;
+
     /**
      * Used to inform {@link com.android.server.power.PowerManagerService} of changes to display
      * state.
@@ -4042,7 +4045,7 @@ public final class DisplayManagerService extends SystemService {
         displayPowerController = mInjector.getDisplayPowerController(
                 mContext, /* injector= */ null, mDisplayPowerCallbacks, mPowerHandler,
                 mSensorManager, mDisplayBlanker, display, mBrightnessTracker, brightnessSetting,
-                () -> handleBrightnessChange(display), hbmMetadata, mBootCompleted, mFlags);
+                () -> handleBrightnessChange(display), hbmMetadata, mBootCompleted, mFlags, this);
         mDisplayPowerControllers.append(display.getDisplayIdLocked(), displayPowerController);
         return displayPowerController;
     }
@@ -5659,6 +5662,22 @@ public final class DisplayManagerService extends SystemService {
         }
 
         @Override
+        public void registerTargetBrightnessListener(TargetBrightnessListener listener) {
+            synchronized (mSyncRoot) {
+                mTargetBrightnessListener = listener;
+            }
+        }
+
+        @Override
+        public void unregisterTargetBrightnessListener(TargetBrightnessListener listener) {
+            synchronized (mSyncRoot) {
+                if (mTargetBrightnessListener == listener) {
+                    mTargetBrightnessListener = null;
+                }
+            }
+        }
+
+        @Override
         public void registerDisplayGroupListener(DisplayGroupListener listener) {
             mDisplayGroupListeners.add(listener);
         }
@@ -6035,6 +6054,12 @@ public final class DisplayManagerService extends SystemService {
                 final LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
                 if (display == null) return Display.INVALID_DISPLAY_GROUP;
                 return display.getDisplayInfoLocked().displayGroupId;
+            }
+        }
+
+        public DisplayManagerInternal.TargetBrightnessListener getTargetBrightnessListener() {
+            synchronized (mSyncRoot) {
+                return mTargetBrightnessListener;
             }
         }
 

@@ -24,7 +24,7 @@ import javax.inject.Singleton;
  * Root component for Dagger injection used in AOSP.
  */
 @Singleton
-@Component(modules = {GlobalModule.class})
+@Component(modules = {GlobalModule.class, DisplayModule.class})
 public interface ReferenceGlobalRootComponent extends GlobalRootComponent {
 
     /**

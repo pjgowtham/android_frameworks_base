@@ -5,7 +5,6 @@
 
 package com.android.systemui.biometrics
 
-import android.animation.ValueAnimator
 import android.annotation.UiThread
 import android.content.Context
 import android.graphics.Color
@@ -21,6 +20,7 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.android.systemui.settings.brightness.domain.interactor.BrightnessMirrorShowingInteractor
+import com.android.systemui.settings.brightness.domain.interactor.DisplayBrightnessInteractor
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +40,7 @@ class UdfpsHelper(
     private val shadeInteractor: ShadeInteractor,
     @RequestReason val requestReason: Int,
     private val brightnessMirrorShowingInteractor: BrightnessMirrorShowingInteractor,
+    private val displayBrightnessInteractor: DisplayBrightnessInteractor,
     private var view: View = View(context).apply {
         setBackgroundColor(Color.BLACK)
         visibility = View.GONE
@@ -48,6 +49,7 @@ class UdfpsHelper(
     private val displayManager = context.getSystemService(DisplayManager::class.java)!!
     private val isKeyguard = requestReason == REASON_AUTH_KEYGUARD
 
+    private var proactiveBrightness: Float = 0.0f
     private val currentBrightness: Float get() =
         displayManager.getBrightness(Display.DEFAULT_DISPLAY)
     private val minBrightness: Float = context.resources
@@ -78,19 +80,6 @@ class UdfpsHelper(
         // Avoid announcing window title
         accessibilityTitle = " "
         inputFeatures = WindowManager.LayoutParams.INPUT_FEATURE_SPY
-    }
-
-    private val alphaAnimator = ValueAnimator().apply {
-        duration = 800L
-        addUpdateListener { animator ->
-            view.alpha = animator.animatedValue as Float
-            dimLayoutParams.alpha = animator.animatedValue as Float
-            try {
-                windowManager.updateViewLayout(view, dimLayoutParams)
-            } catch (e: IllegalArgumentException) {
-                Log.e(TAG, "View not attached to WindowManager", e)
-            }
-        }
     }
 
     private val displayListener = object : DisplayManager.DisplayListener {
@@ -138,15 +127,23 @@ class UdfpsHelper(
     // While it's possible to operate with floats, the dimming array was made by referencing
     // brightness_alpha_lut array from the kernel. This provides a comparable array.
     private fun brightnessToAlpha() {
-        val adjustedBrightness =
-            (currentBrightness.coerceIn(minBrightness, maxBrightness) * maxPanelBrightness).toInt()
+        val brightnessSource: Float
+        // Prioritize the one-time proactive brightness value if it's available.
+        if (proactiveBrightness > 0.0f) {
+            brightnessSource = proactiveBrightness
+            // Reset the proactive brightness so it's only used once per screen-on event.
+            proactiveBrightness = 0.0f
+        } else {
+            brightnessSource = displayManager.getBrightness(Display.DEFAULT_DISPLAY)
+        }
 
+        val adjustedBrightness =
+            (brightnessSource.coerceIn(minBrightness, maxBrightness) * maxPanelBrightness).toInt()
         val targetAlpha = brightnessAlphaMap[adjustedBrightness]?.div(255.0f)
             ?: interpolateAlpha(adjustedBrightness)
 
         Log.i(TAG, "Adjusted Brightness: $adjustedBrightness, Alpha: $targetAlpha")
 
-        alphaAnimator.setFloatValues(view.alpha, targetAlpha)
         // Set the dim for both the view and the layout
         view.alpha = targetAlpha
         dimLayoutParams.alpha = targetAlpha
@@ -171,6 +168,7 @@ class UdfpsHelper(
     init {
         view.repeatWhenAttached {
             repeatOnLifecycle(Lifecycle.State.CREATED) {
+                listenForBrightnessChanges(this)
                 listenForBrightnessMirror(this)
                 if (isKeyguard) {
                     listenForShadeTouchability(this)
@@ -179,6 +177,17 @@ class UdfpsHelper(
         }
         if (!isKeyguard) {
             view.isVisible = true
+        }
+    }
+
+    private suspend fun listenForBrightnessChanges(scope: CoroutineScope): Job {
+        return scope.launch {
+            // Proactive listener for auto-brightness
+            displayBrightnessInteractor.brightness.collect { targetBrightness ->
+                if (targetBrightness >= 0 && currentBrightness == 0f) {
+                    proactiveBrightness = targetBrightness
+                }
+            }
         }
     }
 
@@ -196,8 +205,6 @@ class UdfpsHelper(
                 view.isVisible = it
                 if (view.isVisible) {
                     brightnessToAlpha()
-                    alphaAnimator.cancel()
-                    alphaAnimator.start()
                 }
             }
         }
