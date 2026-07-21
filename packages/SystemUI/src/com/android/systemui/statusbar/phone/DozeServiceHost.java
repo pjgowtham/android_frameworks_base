@@ -48,6 +48,7 @@ import com.android.systemui.doze.DozeReceiver;
 import com.android.systemui.keyguard.WakefulnessLifecycle;
 import com.android.systemui.keyguard.domain.interactor.AodDimInteractor;
 import com.android.systemui.keyguard.domain.interactor.DozeInteractor;
+import com.android.systemui.res.R;
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.shade.NotificationShadeWindowViewController;
 import com.android.systemui.shade.domain.interactor.ShadeLockscreenInteractor;
@@ -316,6 +317,9 @@ public final class DozeServiceHost implements DozeHost {
 
         boolean passiveAuthInterrupt = reason == DozeLog.PULSE_REASON_SENSOR_WAKE_REACH
                         && mWakeLockScreenPerformsAuth;
+        boolean quickPickupAuthUiPulse = reason == DozeLog.REASON_SENSOR_QUICK_PICKUP
+                && mContext.getResources().getBoolean(
+                        R.bool.doze_quick_pickup_hide_non_auth_ui);
         // Set the state to pulsing, so ScrimController will know what to do once we ask it to
         // execute the transition. The pulse callback will then be invoked when the scrims
         // are black, indicating that CentralSurfaces is ready to present the rest of the UI.
@@ -340,7 +344,7 @@ public final class DozeServiceHost implements DozeHost {
             }
 
             private void setPulsing(boolean pulsing) {
-                mStatusBarKeyguardViewManager.setPulsing(pulsing);
+                mStatusBarKeyguardViewManager.setPulsing(pulsing, quickPickupAuthUiPulse);
                 mShadeLockscreenInteractor.setPulsing(pulsing);
                 mStatusBarStateController.setPulsing(pulsing);
                 mIgnoreTouchWhilePulsing = false;

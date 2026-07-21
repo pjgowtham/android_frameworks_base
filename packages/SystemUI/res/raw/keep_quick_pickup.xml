@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Keep resources that are referenced only by runtime resource overlays. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@bool/doze_quick_pickup_hide_non_auth_ui" />

@@ -300,6 +300,7 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
     private boolean mLastGlobalActionsVisible = false;
     private boolean mDozing;
     private boolean mPulsing;
+    private boolean mSuppressNavigationBarForPulsing;
     private boolean mGesturalNav;
     private boolean mIsDocked;
     private boolean mScreenOffAnimationPlaying;
@@ -1157,10 +1158,11 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
     /**
      * If {@link CentralSurfaces} is pulsing.
      */
-    public void setPulsing(boolean pulsing) {
-        if (mPulsing != pulsing) {
+    public void setPulsing(boolean pulsing, boolean suppressNavigationBar) {
+        if (mPulsing != pulsing || mSuppressNavigationBarForPulsing != suppressNavigationBar) {
             mPulsing = pulsing;
             updateStates();
+            mSuppressNavigationBarForPulsing = suppressNavigationBar;
         }
     }
 
@@ -1587,7 +1589,7 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
         boolean keyguardVisible = mKeyguardStateController.isVisible();
         boolean hideWhileDozing = mDozing && !isWakeAndUnlockPulsing;
         boolean showNavBarForPulsing = !com.android.systemui.Flags.newDozingKeyguardStates()
-                && mPulsing && !mIsDocked;
+                && mPulsing && !mSuppressNavigationBarForPulsing && !mIsDocked;
         boolean keyguardWithGestureNav = (keyguardVisible && !mDozing && !mScreenOffAnimationPlaying
                 || showNavBarForPulsing)
                 && mGesturalNav;

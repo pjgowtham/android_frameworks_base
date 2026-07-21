@@ -257,6 +257,13 @@ public class DozeParameters implements
     }
 
     /**
+     * Whether quick pickup pulses should hide non-authentication UI while retaining UDFPS UI.
+     */
+    public boolean shouldHideNonAuthUiOnQuickPickup() {
+        return mResources.getBoolean(R.bool.doze_quick_pickup_hide_non_auth_ui);
+    }
+
+    /**
      * For how long a wallpaper can be visible in AoD before it fades aways.
      * @return duration in millis.
      */

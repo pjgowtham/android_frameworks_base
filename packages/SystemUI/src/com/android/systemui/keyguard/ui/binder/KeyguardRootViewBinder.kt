@@ -20,6 +20,7 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.annotation.DrawableRes
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.graphics.Point
 import android.graphics.Rect
 import android.view.HapticFeedbackConstants
@@ -204,13 +205,11 @@ object KeyguardRootViewBinder {
                         }
                     }
 
-                    if (Flags.newDozingKeyguardStates()) {
-                        launch("$TAG#nonAuthUIAlpha") {
-                            viewModel.nonAuthUIAlpha.collect { alpha ->
-                                for (childView in childViews) {
-                                    if (!authUiIds.contains(childView.key)) {
-                                        childView.value.alpha = alpha
-                                    }
+                    launch("$TAG#nonAuthUIAlpha") {
+                        viewModel.nonAuthUIAlpha.collect { alpha ->
+                            for (childView in childViews) {
+                                if (!authUiIds.contains(childView.key)) {
+                                    childView.value.alpha = alpha
                                 }
                             }
                         }
@@ -596,7 +595,7 @@ object KeyguardRootViewBinder {
     private val deviceEntryIcon = R.id.device_entry_icon_view
     private val nsslPlaceholderId = R.id.nssl_placeholder
     private val authInteractionProperties = AuthInteractionProperties()
-    private val authUiIds = setOf(deviceEntryIcon, indicationArea)
+    private val authUiIds = setOf(deviceEntryIcon)
 
     private const val ID = "occluding_app_device_entry_unlock_msg"
     private const val AOD_ICONS_APPEAR_DURATION: Long = 200
