@@ -699,12 +699,11 @@ constructor(
                 unlockToLauncherWithInWindowAnimations()
             }
 
-            // If we're waking and unlocking to a non-Launcher app surface (or Launcher in-window
-            // animations are not available), show it immediately and end the remote animation. The
-            // circular light reveal will show the app surface, and it looks weird if it's moving
-            // around behind that.
-            biometricUnlockControllerLazy.get().isWakeAndUnlock -> {
-                Log.d(TAG, "playCannedUnlockAnimation, isWakeAndUnlock")
+            // If we're unlocking with biometrics to a non-Launcher app surface (or Launcher
+            // in-window animations are not available), show it immediately and end the remote
+            // animation rather than make the user wait for the canned animation.
+            biometricUnlockControllerLazy.get().isBiometricUnlock -> {
+                Log.d(TAG, "playCannedUnlockAnimation, isBiometricUnlock")
                 setSurfaceBehindAppearAmount(1f)
                 keyguardViewMediator
                     .get()
