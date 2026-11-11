@@ -97,6 +97,7 @@ import com.android.systemui.doze.DozeReceiver;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.keyguard.ScreenLifecycle;
 import com.android.systemui.keyguard.WakefulnessLifecycle;
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.plugins.FalsingManager;
@@ -195,6 +196,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
     @NonNull private final MSDLPlayer mMsdlPlayer;
     private final Lazy<SceneInteractor> mSceneInteractorLazy;
     private final boolean mIgnoreRefreshRate;
+    private final KeyguardInteractor mKeyguardInteractor;
     private final KeyguardTransitionInteractor mKeyguardTransitionInteractor;
 
     // Currently the UdfpsController supports a single UDFPS sensor. If devices have multiple
@@ -319,11 +321,11 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                             requestId,
                             event
                         ),
+                        mKeyguardInteractor,
                         mKeyguardTransitionInteractor,
                         mDeviceEntryUdfpsTouchOverlayViewModel,
                         mDefaultUdfpsTouchOverlayViewModel,
                         mPromptUdfpsTouchOverlayViewModel,
-                        mShadeInteractor,
                         mUdfpsOverlayInteractor,
                         mPowerInteractor,
                         mBrightnessMirrorShowingInteractor,
@@ -719,6 +721,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
             @NonNull InputManager inputManager,
             @NonNull DeviceEntryFaceAuthInteractor deviceEntryFaceAuthInteractor,
             @NonNull SelectedUserInteractor selectedUserInteractor,
+            @NonNull KeyguardInteractor keyguardInteractor,
             @NonNull KeyguardTransitionInteractor keyguardTransitionInteractor,
             Lazy<DeviceEntryUdfpsTouchOverlayViewModel> deviceEntryUdfpsTouchOverlayViewModel,
             Lazy<DefaultUdfpsTouchOverlayViewModel> defaultUdfpsTouchOverlayViewModel,
@@ -776,6 +779,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
         mScope = scope;
         mInputManager = inputManager;
         mSelectedUserInteractor = selectedUserInteractor;
+        mKeyguardInteractor = keyguardInteractor;
         mKeyguardTransitionInteractor = keyguardTransitionInteractor;
 
         mTouchProcessor = singlePointerTouchProcessor;

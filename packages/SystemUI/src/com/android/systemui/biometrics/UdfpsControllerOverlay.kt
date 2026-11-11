@@ -52,12 +52,12 @@ import com.android.systemui.biometrics.ui.viewmodel.DeviceEntryUdfpsTouchOverlay
 import com.android.systemui.biometrics.ui.viewmodel.PromptUdfpsTouchOverlayViewModel
 import com.android.systemui.brightness.domain.interactor.BrightnessMirrorShowingInteractor
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.SceneInteractor
-import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.statusbar.policy.KeyguardStateController
@@ -90,11 +90,11 @@ constructor(
     @RequestReason val requestReason: Int,
     private val controllerCallback: IUdfpsOverlayControllerCallback,
     private val onTouch: (View, MotionEvent) -> Boolean,
+    keyguardInteractor: KeyguardInteractor,
     transitionInteractor: KeyguardTransitionInteractor,
     private val deviceEntryUdfpsTouchOverlayViewModel: Lazy<DeviceEntryUdfpsTouchOverlayViewModel>,
     private val defaultUdfpsTouchOverlayViewModel: Lazy<DefaultUdfpsTouchOverlayViewModel>,
     private val promptUdfpsTouchOverlayViewModel: Lazy<PromptUdfpsTouchOverlayViewModel>,
-    private val shadeInteractor: ShadeInteractor,
     private val udfpsOverlayInteractor: UdfpsOverlayInteractor,
     private val powerInteractor: PowerInteractor,
     private val brightnessMirrorShowingInteractor: BrightnessMirrorShowingInteractor,
@@ -146,8 +146,8 @@ constructor(
     )
 
     private val udfpsHelper: UdfpsHelper? = if (useFrameworkDimming) {
-        UdfpsHelper(context, windowManager, shadeInteractor, requestReason,
-                brightnessMirrorShowingInteractor)
+        UdfpsHelper(context, windowManager, requestReason, brightnessMirrorShowingInteractor,
+                powerInteractor, keyguardInteractor)
     } else {
         null
     }

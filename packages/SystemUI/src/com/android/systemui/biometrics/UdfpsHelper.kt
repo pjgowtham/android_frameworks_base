@@ -32,10 +32,13 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.android.systemui.brightness.domain.interactor.BrightnessMirrorShowingInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
+import com.android.systemui.keyguard.shared.model.isPulsing
 import com.android.systemui.lifecycle.repeatWhenAttached
-import com.android.systemui.shade.domain.interactor.ShadeInteractor
+import com.android.systemui.power.domain.interactor.PowerInteractor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 private const val TAG = "UdfpsHelper"
@@ -48,9 +51,10 @@ private const val TAG = "UdfpsHelper"
 class UdfpsHelper(
     private val context: Context,
     private val windowManager: WindowManager,
-    private val shadeInteractor: ShadeInteractor,
     @RequestReason val requestReason: Int,
     private val brightnessMirrorShowingInteractor: BrightnessMirrorShowingInteractor,
+    private val powerInteractor: PowerInteractor,
+    private val keyguardInteractor: KeyguardInteractor,
     private var view: View = View(context).apply {
         setBackgroundColor(Color.BLACK)
         visibility = View.GONE
@@ -61,19 +65,32 @@ class UdfpsHelper(
 
     private var isDimLayerAdded = false
 
+    private val display: Display? get() = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
+
+    // The brightness the panel is actually driven at, which includes the doze brightness
     private val currentBrightness: Float get() =
-        displayManager.getBrightness(Display.DEFAULT_DISPLAY)
-    private val minBrightness: Float = context.resources
-        .getFloat(com.android.internal.R.dimen.config_screenBrightnessSettingMinimumFloat)
-    private val maxBrightness: Float = context.resources
-        .getFloat(com.android.internal.R.dimen.config_screenBrightnessSettingMaximumFloat)
+        display?.brightnessInfo?.adjustedBrightness
+            ?: displayManager.getBrightness(Display.DEFAULT_DISPLAY)
     private val brightnessAlphaMap: Map<Int, Int> = context.resources
         .getStringArray(com.android.systemui.res.R.array.config_udfpsDimmingBrightnessAlphaArray)
         .associate {
             val (brightness, alpha) = it.split(",").map { value -> value.trim().toInt() }
             brightness to alpha
         }
+    private val minPanelBrightness: Int = brightnessAlphaMap.keys.min()
     val maxPanelBrightness: Int = brightnessAlphaMap.keys.max()
+
+    private var isBrightnessMirrorShowing = false
+
+    // Pulses keep the panel on, while AOD and doze put it in a low power mode or turn it off,
+    // where nothing can light up the sensor area
+    private val isDisplayOn: Boolean get() = display?.state == Display.STATE_ON
+
+    // The display stays on through the screen off animation after going to sleep, so only
+    // a pulse may show the dim layer while asleep
+    private val isAwakeOrPulsing: Boolean get() =
+        powerInteractor.detailedWakefulness.value.isAwake() ||
+            keyguardInteractor.dozeTransitionModel.value.to.isPulsing()
 
     private val dimLayoutParams = WindowManager.LayoutParams(
         WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL,
@@ -112,7 +129,9 @@ class UdfpsHelper(
         override fun onDisplayAdded(displayId: Int) {}
 
         override fun onDisplayChanged(displayId: Int) {
-            if (displayId == Display.DEFAULT_DISPLAY && view.parent != null) {
+            // A fade in already tracks the brightness and updates the layout
+            if (displayId == Display.DEFAULT_DISPLAY && view.parent != null &&
+                !updateVisibility()) {
                 brightnessToAlpha()
                 windowManager.updateViewLayout(view, dimLayoutParams)
             }
@@ -148,13 +167,12 @@ class UdfpsHelper(
         ).div(255.0f)
     }
 
-    // The current function does not account for Doze state where the brightness can go lower
-    // than what is set on config_screenBrightnessSettingMinimumFloat.
     // While it's possible to operate with floats, the dimming array was made by referencing
     // brightness_alpha_lut array from the kernel. This provides a comparable array.
+    // The doze brightness can go below the lowest entry, which then gets the most dimming.
     private fun brightnessToAlpha() {
-        val adjustedBrightness =
-            (currentBrightness.coerceIn(minBrightness, maxBrightness) * maxPanelBrightness).toInt()
+        val adjustedBrightness = (currentBrightness * maxPanelBrightness).toInt()
+            .coerceIn(minPanelBrightness, maxPanelBrightness)
 
         val targetAlpha = brightnessAlphaMap[adjustedBrightness]?.div(255.0f)
             ?: interpolateAlpha(adjustedBrightness)
@@ -177,8 +195,11 @@ class UdfpsHelper(
         displayManager.registerDisplayListener(
             displayListener,
             null,
-            DisplayManager.EVENT_TYPE_DISPLAY_BRIGHTNESS,
+            DisplayManager.EVENT_TYPE_DISPLAY_CHANGED or
+                DisplayManager.EVENT_TYPE_DISPLAY_STATE or
+                DisplayManager.EVENT_TYPE_DISPLAY_BRIGHTNESS,
         )
+        updateVisibility()
     }
 
     fun removeDimLayer() {
@@ -197,35 +218,40 @@ class UdfpsHelper(
         view.repeatWhenAttached {
             repeatOnLifecycle(Lifecycle.State.CREATED) {
                 listenForBrightnessMirror(this)
-
                 if (isKeyguard) {
-                    listenForShadeTouchability(this)
+                    listenForWakefulness(this)
                 }
             }
         }
+    }
 
-        if (!isKeyguard) {
-            view.isVisible = true
-        }
+    // Returns whether the dim layer started fading in
+    private fun updateVisibility(): Boolean {
+        val visible = !isBrightnessMirrorShowing &&
+            (!isKeyguard || (isDisplayOn && isAwakeOrPulsing))
+        if (view.isVisible == visible) return false
+
+        view.isVisible = visible
+        if (!visible || !isKeyguard) return false
+
+        brightnessToAlpha()
+        alphaAnimator.start()
+        return true
     }
 
     private suspend fun listenForBrightnessMirror(scope: CoroutineScope): Job {
         return scope.launch {
             brightnessMirrorShowingInteractor.isShowing.collect {
-                view.isVisible = !it
+                isBrightnessMirrorShowing = it
+                updateVisibility()
             }
         }
     }
 
-    private suspend fun listenForShadeTouchability(scope: CoroutineScope): Job {
+    private suspend fun listenForWakefulness(scope: CoroutineScope): Job {
         return scope.launch {
-            shadeInteractor.isShadeTouchable.collect {
-                view.isVisible = it
-                if (view.isVisible) {
-                    brightnessToAlpha()
-                    alphaAnimator.start()
-                }
-            }
+            combine(powerInteractor.isAwake, keyguardInteractor.dozeTransitionModel) { _, _ -> }
+                .collect { updateVisibility() }
         }
     }
 }
