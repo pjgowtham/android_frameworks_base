@@ -190,7 +190,6 @@ object KeyguardRootViewBinder {
                         viewModel.alpha(viewState).collect { alpha ->
                             view.alpha = alpha
                             childViews[burnInLayerId]?.alpha = alpha
-                            childViews[sliceViewId]?.alpha = alpha
                         }
                     }
 
