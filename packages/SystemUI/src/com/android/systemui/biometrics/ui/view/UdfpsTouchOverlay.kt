@@ -17,8 +17,8 @@ package com.android.systemui.biometrics.ui.view
 
 import android.content.Context
 import android.graphics.Rect
-import android.graphics.RectF
 import android.util.AttributeSet
+import android.view.Gravity
 import android.view.Surface
 import android.widget.FrameLayout
 import com.android.systemui.biometrics.UdfpsDisplayModeProvider
@@ -36,6 +36,15 @@ class UdfpsTouchOverlay(context: Context, attrs: AttributeSet?) : FrameLayout(co
     // sensorRect may be bigger than the sensor. True sensor dimensions are defined in
     // overlayParams.sensorBounds
     var sensorRect = Rect()
+        set(value) {
+            field = value
+            // Size the illumination surface to the sensor rather than the whole overlay
+            ghbmView?.layoutParams =
+                LayoutParams(value.width(), value.height(), Gravity.TOP or Gravity.LEFT).apply {
+                    leftMargin = value.left
+                    topMargin = value.top
+                }
+        }
 
     /** True after the call to [configureDisplay] and before the call to [unconfigureDisplay]. */
     var isDisplayConfigured: Boolean = false
@@ -54,7 +63,6 @@ class UdfpsTouchOverlay(context: Context, attrs: AttributeSet?) : FrameLayout(co
         val gView = ghbmView
         if (gView != null) {
             gView.setGhbmIlluminationListener(this::doIlluminate)
-            gView.visibility = VISIBLE
             gView.startGhbmIllumination(onDisplayConfigured)
         } else {
             doIlluminate(null /* surface */, onDisplayConfigured)
@@ -64,7 +72,7 @@ class UdfpsTouchOverlay(context: Context, attrs: AttributeSet?) : FrameLayout(co
     private fun doIlluminate(surface: Surface?, onDisplayConfigured: Runnable?) {
         udfpsDisplayMode?.enable {
             onDisplayConfigured?.run()
-            ghbmView?.drawIlluminationDot(RectF(sensorRect))
+            ghbmView?.showIlluminationDot()
         }
     }
 
@@ -72,7 +80,7 @@ class UdfpsTouchOverlay(context: Context, attrs: AttributeSet?) : FrameLayout(co
         isDisplayConfigured = false
         ghbmView?.let { view ->
             view.setGhbmIlluminationListener(null)
-            view.visibility = INVISIBLE
+            view.hideIlluminationDot()
         }
         udfpsDisplayMode?.disable(null /* onDisabled */)
     }

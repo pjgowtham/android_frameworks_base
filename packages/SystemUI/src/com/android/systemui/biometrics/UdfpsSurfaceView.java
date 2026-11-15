@@ -67,6 +67,10 @@ public class UdfpsSurfaceView extends SurfaceView implements SurfaceHolder.Callb
         // 2) Properly composite this view with any other animations in the same window no matter
         //    what contents are added in which order to this view hierarchy.
         setZOrderOnTop(true);
+        // Keep the surface and its dot around while the overlay is up, and only reveal it through
+        // alpha. That keeps surface creation and drawing off the touch path, and a transparent
+        // layer is left out of composition, so the touched layer only exists while illuminating.
+        setAlpha(0f);
 
         mHolder = getHolder();
         mHolder.addCallback(this);
@@ -91,7 +95,7 @@ public class UdfpsSurfaceView extends SurfaceView implements SurfaceHolder.Callb
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        // Unused.
+        drawIlluminationDot(new RectF(0, 0, width, height));
     }
 
     @Override public void surfaceDestroyed(SurfaceHolder holder) {
@@ -104,8 +108,7 @@ public class UdfpsSurfaceView extends SurfaceView implements SurfaceHolder.Callb
 
     /**
      * Note: there is no corresponding method to stop GHBM illumination. It is expected that
-     * {@link UdfpsView} will hide this view, which would destroy the surface and remove the
-     * illumination dot.
+     * {@link #hideIlluminationDot} is called to remove the illumination dot.
      */
     public void startGhbmIllumination(@Nullable Runnable onDisplayConfigured) {
         if (mGhbmIlluminationListener == null) {
@@ -130,10 +133,17 @@ public class UdfpsSurfaceView extends SurfaceView implements SurfaceHolder.Callb
         mGhbmIlluminationListener.enableGhbm(mHolder.getSurface(), onDisplayConfigured);
     }
 
-    /**
-     * Immediately draws the illumination dot on this SurfaceView's surface.
-     */
-    public void drawIlluminationDot(@NonNull RectF sensorRect) {
+    /** Shows the illumination dot, which is drawn whenever the surface changes. */
+    public void showIlluminationDot() {
+        setAlpha(1f);
+    }
+
+    /** Hides the illumination dot while keeping the surface for the next touch. */
+    public void hideIlluminationDot() {
+        setAlpha(0f);
+    }
+
+    private void drawIlluminationDot(@NonNull RectF sensorRect) {
         if (!mHasValidSurface) {
             Log.e(TAG, "drawIlluminationDot | the surface is destroyed or was never created.");
             return;
