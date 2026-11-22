@@ -126,6 +126,8 @@ import android.util.PrintWriterPrinter;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.Xml;
+import android.util.apk.SourceStampVerificationResult;
+import android.util.apk.SourceStampVerifier;
 import android.util.proto.ProtoOutputStream;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -165,6 +167,7 @@ import com.android.server.utils.WatchedSparseIntArray;
 import com.android.server.wm.ActivityTaskManagerInternal;
 
 import libcore.util.EmptyArray;
+import libcore.util.HexEncoding;
 
 import java.io.BufferedOutputStream;
 import java.io.FileDescriptor;
@@ -172,6 +175,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -182,6 +188,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This class contains the implementation of the Computer functions.  It
@@ -428,6 +435,14 @@ public class ComputerEngine implements Computer {
     private final DomainVerificationManagerInternal mDomainVerificationManager;
     private final PackageManagerInternal.ExternalSourcesPolicy mExternalSourcesPolicy;
     private final CrossProfileIntentResolverEngine mCrossProfileIntentResolverEngine;
+
+    private static final String PLAY_STORE = "com.android.vending";
+    // SHA-256 of the certificate Google Play signs the source stamps of its APKs with
+    private static final byte[] PLAY_SOURCE_STAMP_CERT_SHA256 = HexEncoding.decode(
+            "3257d599a49d2c961a471ca9843f59d341a405884583fc087df4237b733bbd6d");
+    // Package name -> last update time it was checked at and whether it is stamped by Play
+    private static final ConcurrentHashMap<String, Pair<Long, Boolean>> sPlayStampedCache =
+            new ConcurrentHashMap<>();
 
     // PackageManagerService attributes that are primitives are referenced through the
     // pms object directly.  Primitives are the only attributes so referenced.
@@ -5173,7 +5188,52 @@ public class ComputerEngine implements Computer {
             return null;
         }
 
-        return ps.getInstallSource();
+        final InstallSource installSource = ps.getInstallSource();
+        final String installerPackageName = installSource.mInstallerPackageName;
+        final PackageStateInternal playStore = mSettings.getPackage(PLAY_STORE);
+        // Play stamps the APKs it serves, so a valid Play stamp proves the app came from Play
+        // whichever client installed it. Name Play as the installer of record then, but keep
+        // the initiating package and its signatures, and tell the installer and Play the truth.
+        if (playStore != null && !PLAY_STORE.equals(installerPackageName)
+                && (!ps.isSystem() || ps.isUpdatedSystemApp())
+                && callingUid != Process.SYSTEM_UID
+                && !isCallerSameApp(PLAY_STORE, callingUid)
+                && (installerPackageName == null
+                        || !isCallerSameApp(installerPackageName, callingUid))
+                && isStampedByPlay(ps)) {
+            return installSource.setInstallerPackage(PLAY_STORE,
+                    UserHandle.getUid(userId, playStore.getAppId()));
+        }
+
+        return installSource;
+    }
+
+    private static boolean isStampedByPlay(@NonNull PackageStateInternal ps) {
+        final AndroidPackage pkg = ps.getPkg();
+        if (pkg == null) {
+            return false;
+        }
+        final long lastUpdateTime = ps.getLastUpdateTime();
+        final Pair<Long, Boolean> cached = sPlayStampedCache.get(ps.getPackageName());
+        if (cached != null && cached.first == lastUpdateTime) {
+            return cached.second;
+        }
+        final List<String> apks = new ArrayList<>();
+        apks.add(pkg.getBaseApkPath());
+        Collections.addAll(apks, pkg.getSplitCodePaths());
+        boolean stamped = false;
+        final SourceStampVerificationResult result = SourceStampVerifier.verify(apks);
+        if (result.isVerified()) {
+            try {
+                stamped = Arrays.equals(PLAY_SOURCE_STAMP_CERT_SHA256,
+                        MessageDigest.getInstance("SHA-256").digest(
+                                result.getCertificate().getEncoded()));
+            } catch (CertificateEncodingException | NoSuchAlgorithmException e) {
+                Slog.w(TAG, "Failed to check source stamp of " + ps.getPackageName(), e);
+            }
+        }
+        sPlayStampedCache.put(ps.getPackageName(), Pair.create(lastUpdateTime, stamped));
+        return stamped;
     }
 
     @Override
